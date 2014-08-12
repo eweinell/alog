@@ -5,7 +5,6 @@ import Messages._
 import Internal._
 import parser.Messages._
 import util.Helpers
-
 import akka.actor._
 import akka.dispatch._
 import akka.pattern._
@@ -17,8 +16,11 @@ import scala.util._
 import java.security.MessageDigest
 import java.io.IOException
 import java.util.concurrent.Executors
+import java.net.URI
+import com.jcraft.jsch._
+import akka.util.Timeout
 
-class AppLogLoader(rcv:ActorRef) extends Actor with FSM[LogLoaderState, LogLoaderData] with ActorLogging{
+class AppLogLoader(rcv:ActorRef, loaderSvc:ActorRef) extends Actor with FSM[LogLoaderState, LogLoaderData] with ActorLogging{
   
   startWith(Idle, Uninitialized)
   
@@ -44,7 +46,7 @@ class AppLogLoader(rcv:ActorRef) extends Actor with FSM[LogLoaderState, LogLoade
   
   onTransition {
     case Idle -> Busy => 
-      setTimer("workTimeout", WorkTimeout, AppLogLoader.timeout)      
+      setTimer("workTimeout", WorkTimeout, AppLogLoader.processTimeout)      
     case Busy -> Idle =>
       cancelTimer("workTimeout")
   }
@@ -55,18 +57,17 @@ class AppLogLoader(rcv:ActorRef) extends Actor with FSM[LogLoaderState, LogLoade
 
   	Future firstCompletedOf ( 
       (
-        Future {
+        readLines(l.file, loaderSvc).map { full =>
           log.debug(s"about to read ${l.file}, known state is ${l.recentState}")
-  		    val full = readLines(l.file).toSeq
   		    val res = l.recentState match {
-  		      case Some(ReadState(Some(readMark),_,_,_)) => 
+  		      case Some(ReadState(Some(readMark),_,_,_,_)) => 
   		        full dropWhile(e => !(e._2 sameElements readMark)) match {
     		        case Nil => full
     		        case some => some drop 1
   		      }
   		      case _ => full
   		    }
-  		    (res.lastOption.map(_._2), res.map(_._1))
+  		    (res.lastOption.map(_._2).orElse(l.recentState.flatMap(_.readMark)).orElse(Some(Array[Byte](0))), res.map(_._1))
     		}(ioExecutor) map {
     		  case (readmark:Option[Array[Byte]], msg:Seq[String]) =>
       	    val newLogState = l update ReadStateHelpers.succeeded(readmark)_
@@ -75,7 +76,7 @@ class AppLogLoader(rcv:ActorRef) extends Actor with FSM[LogLoaderState, LogLoade
         	  log.debug(s"Sent ${rm.msgs.length} new messages over the wire")
     		}
   		) ::
-  		after(timeout, context.system.scheduler) {
+  		after(processTimeout, context.system.scheduler) {
   		  Future failed TimeoutException()
   		} :: Nil
   	) andThen {
@@ -93,24 +94,29 @@ class AppLogLoader(rcv:ActorRef) extends Actor with FSM[LogLoaderState, LogLoade
 
 object AppLogLoader extends Helpers {
   
-  val timeout = 16 seconds
+  val processTimeout = 60 seconds
+  
+  val historyLogsize = 8
   
   val ioExecutor:ExecutionContextExecutor  = 
     ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
   
   val x = ThreadPoolConfig(corePoolSize=1, maxPoolSize=4)
   
-  def props(rcv:ActorRef): Props = Props(new AppLogLoader(rcv))
+  def props(rcv:ActorRef, loaderSvc:ActorRef): Props = Props(new AppLogLoader(rcv, loaderSvc))
   
   implicit val codec = Codec.ISO8859
-
-  private def readLines(logFile:String): Iterator[(String, Array[Byte])] = { 
+  
+  private def readLines(logFile:String, loaderSvc:ActorRef): Future[Seq[(String, Array[Byte])]] = { 
 		def hashAlong(b:(String, Array[Byte]), s:String) = (s, hash(b._2, s.getBytes))
-		Source.fromFile(logFile).getLines
-			.scanLeft("", Array[Byte](0))(hashAlong)
-			.drop(1)
+  	implicit val ec = ioExecutor
+  	val source = Try(new URI(logFile)).filter(_.getScheme()=="scp").map { u =>
+  	  implicit val to = Timeout(60 seconds)
+		  loaderSvc ? LoadRequest(u, codec) collect { case LoadResult(s) => s }
+		} getOrElse Future { Source.fromFile(logFile).getLines.toSeq }
+		source.map(
+		  _.scanLeft("", Array[Byte](0))(hashAlong).drop(1))
 	}
-
 
 }
 
@@ -128,21 +134,26 @@ object Internal {
 }
 
 object ReadStateHelpers {
-    def succeeded(mark:Option[Array[Byte]])(s:Option[ReadState]) = update(mark, false, 
-        (mark, s) match { 
-          case (Some(m1), Some(ReadState(Some(m2), _,_,_))) if m1.sameElements(m2) => "unchanged" 
-          case _ => "OK"}) (s)
-    def failed(m:String)(s:Option[ReadState]) = update(s.flatMap(_.readMark), true, m)(s)
+    def succeeded(mark:Option[Array[Byte]])(s:Option[ReadState]) = {
+      val (msg, hist) = (mark, s) match { 
+        case (Some(m1), Some(ReadState(Some(m2), _,_,_,_))) if m1.sameElements(m2) => ("unchanged", false) 
+        case _ => 
+          ("OK", true)
+      }
+      update(mark, false, msg, hist) (s)
+    }
+    def failed(m:String)(s:Option[ReadState]) = update(s.flatMap(_.readMark), true, m, false)(s)
     
-    private def update(newReadMark:Option[Array[Byte]], newFailed:Boolean, newState:String)(s:Option[ReadState]): ReadState = {
+    private def update(newReadMark:Option[Array[Byte]], newFailed:Boolean, newState:String, historize:Boolean)(s:Option[ReadState]): ReadState = {
       ReadState(
         readMark=newReadMark.orElse(s.flatMap(_.readMark)).orElse(None), 
         failed=newFailed, 
         state=newState, 
         occurences=s match {
-          case Some(ReadState(_,oldFailed,oldState,i)) if oldFailed == newFailed && oldState == newState => i + 1
+          case Some(ReadState(_,oldFailed,oldState,i,_)) if oldFailed == newFailed && oldState == newState => i + 1
           case _ => 1
-        }
+        },
+        ((if (historize) List(System.currentTimeMillis) else Nil) ++ s.map(_.history).getOrElse(Nil)).take(AppLogLoader.historyLogsize)
       )
     }
 }

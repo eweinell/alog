@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html ng-app="AlogApp">
+<head>
+<meta charset="ISO-8859-1">
+<link rel="stylesheet" href="css/min/bootstrap.min.css">
+<!-- <link rel="stylesheet" href="css/bootstrap-theme.css"> -->
+<!-- <link rel="stylesheet" href="css/datetimepicker.css"> -->
+<link rel="stylesheet" href="css/alog.css">
+</head>
+<body ng-controller="AlogCtrl">
+	<div ng-controller="AlogCometCtrl">
+	
+		<div class="navbar navbar-fixed-top" role="navigation">
+			<div class="container-fluid">
+				<div class="navbar-header">
+					<a class="navbar-brand" href="#">&#257;log</a>
+				</div>
+				<ul class="nav navbar-nav navbar-right" ng-controller="LogUpdateCometCtrl">
+					<li><span class="badge" ng-show="logUpdateVM.logCount" ng-click="logUpdateVM.setQueryTimerange()" popover-trigger="mouseenter" popover-placement="bottom" popover="{{logUpdateVM.logCount}} Nachrichten erhalten. Hier klicken um zu fokussieren.">{{logUpdateVM.logCount}}</span></li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="container-fluid">
+			<div class="row panel" >
+				<div class="date-time-mode col-md-1">
+					<ul class="list-unstyled">
+					<li><label class="btn btn-primary btn-xs" ng-model="logVM.uiSettings.dateMode" btn-radio="'from_dur'"><span class="glyphicon glyphicon-step-backward ">&nbsp;</span><span class="glyphicon glyphicon-forward"></span></label></li>
+					<li><label class="btn btn-primary btn-xs" ng-model="logVM.uiSettings.dateMode" btn-radio="'from_till'"><span class="glyphicon glyphicon-step-backward">&nbsp;</span><span class="glyphicon glyphicon-step-forward"></span></label></li>
+					<li><label class="btn btn-primary btn-xs" ng-model="logVM.uiSettings.dateMode" btn-radio="'dur_till'"><span class="glyphicon glyphicon-backward">&nbsp;</span><span class="glyphicon glyphicon-step-forward"></span></label></li>										
+					</ul>
+				</div>
+	               <div class="date-time-pck col-md-3" ng-show="logVM.isDateChooserVisible('from')">
+					<div ng-controller="DateTimeCtrl" class="datepck input-group col-md-7">
+						<span class="input-group-addon">von: </span>
+						<input type="text" class="form-control" datepicker-popup="{{dateFormat}}" ng-model="logVM.uiSettings.dateFrom" is-open="opened" max-date="'2099-12-31'" datepicker-options="dateOptions" close-text="Schlie&szlig;en" current-text="heute" clear-text="Zur&uuml;ckseten"/>
+						<span class="input-group-btn"><button type="button" class="btn btn-default" ng-click="open($event)"><i class="glyphicon glyphicon-calendar"></i></button></span>
+					</div>
+					<div class="timepck col-md-5">
+						<timepicker ng-model="logVM.uiSettings.dateFrom" hour-step="1" minute-step="5" show-meridian="false"></timepicker>
+					</div>
+	               </div>
+	               <div class="col-md-2 form-inline form-group duration" ng-show="logVM.isDateChooserVisible('dur')">
+	               	<input class="form-control durationInput" ng-model="logVM.uiSettings.duration">
+	               	<select class="form-control durationCat" ng-model="logVM.uiSettings.durationCat" ng-options="f.label for f in logVM.util.durationCats track by f.key"></select>
+	               </div>
+	               <div class="date-time-pck col-md-3" ng-show="logVM.isDateChooserVisible('till')">
+					<div ng-controller="DateTimeCtrl" class="datepck input-group col-md-7">
+						<span class="input-group-addon">bis: </span>
+						<input type="text" class="form-control" datepicker-popup="{{dateFormat}}" ng-model="logVM.uiSettings.dateTill" is-open="opened" max-date="'2099-12-31'" datepicker-options="dateOptions" close-text="Schlie&szlig;en" current-text="heute" clear-text="Zur&uuml;ckseten"/>
+						<span class="input-group-btn"><button type="button" class="btn btn-default" ng-click="open($event)"><i class="glyphicon glyphicon-calendar"></i></button></span>
+					</div>
+					<div class="timepck col-md-5">
+						<timepicker ng-model="logVM.uiSettings.dateTill" hour-step="1" minute-step="5" show-meridian="false"></timepicker>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<button class="btn btn-primary btn-xs text-center" ng-click="logVM.adjustDate(-86400)"><span class="glyphicon glyphicon-fast-backward ">&nbsp;</span></button>
+					<button class="btn btn-primary btn-xs" ng-click="logVM.adjustDate(-3600)"><span class="glyphicon glyphicon-step-backward ">&nbsp;</span></button>
+					<button class="btn btn-primary btn-xs" ng-click="logVM.adjustDate(3600)"><span class="glyphicon glyphicon-step-forward ">&nbsp;</span></button>						
+					<button class="btn btn-primary btn-xs" ng-click="logVM.adjustDate(86400)"><span class="glyphicon glyphicon-fast-forward ">&nbsp;</span></button>
+					<button class="btn btn-primary btn-xs" ng-click="logVM.setLive()"><span class="glyphicon glyphicon-play "></span>&nbsp;<span class="glyphicon glyphicon-asterisk">&nbsp;</span></button>
+				</div>
+            </div>
+			<div class="row col-md-12" ng-controller="TimelineCtrl">
+				<div id="timeline_chart"></div>		
+				<div class="btn-group" dropdown is-open="timelineVM.isSettingsPanelOpen">
+					<button class="plainBtn dropdown-toggle"><span class="glyphicon glyphicon-cog"></span><span class="caret"></span></button>
+					<ul class="dropdown-menu">
+						<li class="dropdown-header">Aufl&ouml;sung</li>
+						<li><a href="#" ng-click="timelineVM.timelineInputRes=''">Auto</a></li>
+						<li ng-repeat="resolution in timelineVM.timelineResolutions"><a href="#" ng-class="{checked:timelineVM.timelineInputRes==resolution[0]}" ng-click="timelineVM.timelineInputRes=resolution[0]">{{resolution[1]}}</a></li>
+					</ul>
+				</div>				
+				<p class="text-right"><small>{{timelineVM.timelineTotal | number:0}} entries</small></p>
+			</div>
+			<div class="row">
+				<div class="col-md-3 sidebar" ng-controller="FilterSelectionCtrl" ng-init="featuresVM.loadFeatures()">
+					<accordion close-others="oneAtATime">
+						 <accordion-group heading="Filter" is-open="status.isFilterOpen">
+						 	<div ng-repeat="f in featuresVM.features" class="filterRow input-group">
+							 	<input ng-model="logVM.querySettings[f]" type="text" placeholder="{{f}}" class="form-control" typeahead="value for value in featuresVM.getValueProposals(f, $viewValue)" ng-blur="$emit('parameterChanged')" >
+							 	<button class="plainBtn deleteBtn glyphicon glyphicon-remove-sign" ng-show="logVM.querySettings[f]" ng-click="logVM.setFilter(f, '')"></button>
+					 			<span class="input-group-btn">
+					 			<button class="btn btn-default" type="button" btn-checkbox ng-model="logVM.featureDisplayed[f]" ng-init="logVM.featureDisplayed[f]=true">
+						 			<span class="glyphicon glyphicon-eye-open" ng-show="logVM.featureDisplayed[f]"></span>
+						 			<span class="glyphicon glyphicon-eye-close" ng-show="!logVM.featureDisplayed[f]"></span>
+					 			</button>
+							 	<button class="btn btn-default" type="button" btn-checkbox ng-model="logVM.featureGrouped[f]">
+							 		<span class="glyphicon glyphicon-tower"></span>
+							 	</button>
+					 			</span>
+						 	</div>
+						 	<input ng-model="logVM.querySettings.qmessage" type="text" placeholder="text" class="form-control">
+						 	<div class="filterRow input-group all">
+						 		<span>Alle</span>
+						 		<span class="input-group-btn">
+								 	<button class="btn btn-default plainBtn btn-xs glyphicon glyphicon-remove-sign" type="button" ng-click="logVM.clearFilters(featuresVM.features)"></button>
+						 			<button class="btn btn-default btn-xs glyphicon glyphicon-eye-open" type="button" ng-click="featuresVM.setAll(logVM.featureDisplayed, true)"></button>
+								 	<button class="btn btn-default btn-xs glyphicon glyphicon-eye-close" type="button" ng-click="featuresVM.setAll(logVM.featureDisplayed, false)"></button>
+						 		</span>
+						 		
+					 		</div>
+						 </accordion-group>
+<!-- 						 <accordion-group heading="Anzeige" is-open="status.isDisplayOpen"> -->
+<!-- 						 	<label>Felder anzeigen</label> -->
+<!-- 						 	<div class="filterRow"> -->
+<!-- 						 	</div> -->
+<!-- 						 </accordion-group> -->
+						 <div ng-controller="GroupCtrl">
+						 	<div ng-repeat="f in featuresVM.features" ng-show="logVM.featureGrouped[f]">
+						 		<label>Top-5 {{f}}</label>
+							 	<div id="group_view_{{f}}" class="group_chart"></div>
+						 	</div>
+						 </div>
+					</accordion>
+				</div>
+				<div class="col-md-9 main" >
+					<button ng-click="logVM.loadLogEntries()" class="glyphicon glyphicon-refresh"></button>
+					<ul class="list-group logEntriesList"  > <!-- alog-scrolled="logVM.loadMore()" -->
+						<li ng-repeat="le in logVM.logEntries track by $index" class="list-group-item" >
+							<span class="log timestamp">{{le.timestamp}}</span> 
+							<span ng-repeat="fkey in le.__features" ng-show="logVM.featureDisplayed[fkey]" class="log feature">
+								[<span class="log key">{{fkey}}</span>: 
+								<span class="log value">{{le[fkey]}}</span><a href="javascript:void(0)"><label ng-click="logVM.setFilter(fkey, le[fkey])" class="glyphicon glyphicon-filter logFeatureFilter" ng-class="{notFiltered: !logVM.querySettings[fkey], filtered: logVM.querySettings[fkey]}"></label></a>]
+							</span> 
+							<a ng-click="logVM.showDetail($index)" href="javascript:void(0);" >
+								<span class="log message">{{le.message | limitTo:225}}</span>
+							</a>
+						</li>
+					</ul>
+					<div class="text-center">
+						<button class="btn btn-default" ng-click="logVM.loadMore()">mehr&hellip;</button>
+					</div>
+					    <script type="text/ng-template" id="logDetails.html">
+        <div class="modal-header">
+            <h3 class="modal-title">Log</h3>
+        </div>
+        <div class="modal-body">
+			<h4>
+				<span class="log logDetail timestamp">{{logDetailsVM.logEntry.timestamp}}</span>
+				<div class="log logDetail topButtons pull-right">
+					<button class="btn btn-sm btn-primary" ng-click="logDetailsVM.move(-1)" ng-disabled="logDetailsVM.currentIndex < 1"><span class="glyphicon glyphicon-chevron-left"></span></button>
+					<button class="btn btn-sm btn-primary" ng-click="logDetailsVM.move(1)" ng-disabled="logDetailsVM.currentIndex >= logDetailsVM.maxIndex"><span class="glyphicon glyphicon-chevron-right"></span></button>
+				</div>
+			</h4>
+			<ul class="logDetail list-unstyled">
+				<li ng-repeat="fkey in logDetailsVM.logEntry.__features">
+					<div class="col-md-1 log logDetail key">{{fkey}}</div>
+					<div class="col-md-5 log logDetail value" ng-bind-html="logDetailsVM.logEntry[fkey] | wbrify"></div>
+				</li>
+			</ul>
+			<div class="log logDetail message col-md-12">
+				<p>{{logDetailsVM.logEntry.message}}</p>
+			</div>
+        </div>
+        <div class="modal-footer">
+			<div class="btn-group" dropdown>
+				<button type="button" class="btn btn-default" ng-click="logDetailsVM.okAndFocus(1)">Fokussieren: 1 Sek.</button>
+				<button type="button" class="btn btn-default dropdown-toggle">
+					<span class="caret"></span>
+					<span class="sr-only">Toggle Dropdown</span>
+				</button>
+				<ul class="dropdown-menu" role="menu">
+					<li><a href="#" ng-click="logDetailsVM.okAndFocus(1)">1 Sek.</a></li>
+					<li><a href="#" ng-click="logDetailsVM.okAndFocus(10)">10 Sek.</a></li>
+					<li><a href="#" ng-click="logDetailsVM.okAndFocus(60)">1 Min.</a></li>
+				</ul>
+			</div>
+            <button class="btn btn-primary" ng-click="logDetailsVM.ok()">Schlie&szlig;en</button>
+        </div>
+    					</script>
+				</div>
+			</div>
+		</div>
+
+	</div>
+
+
+	<script type="text/javascript" src="js/angular.js"></script>
+<!-- 	<script type="text/javascript" src="js/min/angular.min.js"></script> -->
+	<script type="text/javascript" src="js/angular-locale_de-de.js"></script>
+	<script type="text/javascript" src="js/min/ui-bootstrap-tpls-0.11.0.min.js"></script>
+	<script type="text/javascript" src="js/min/jquery.min.js"></script>
+	<script type="text/javascript" src="js/min/jquery.flot.min.js"></script>
+	<script type="text/javascript" src="js/min/jquery.flot.time.min.js"></script>
+	<script type="text/javascript" src="js/min/jquery.flot.selection.min.js"></script>
+	<script type="text/javascript" src="js/min/jquery.flot.pie.min.js"></script>
+	<script type="text/javascript" src="js/min/moment.min.js"></script>
+<!--	<script type="text/javascript" src="js/datetimepicker.js"></script> -->
+	<script type="text/javascript" src="js/alog.js"></script>
+	<script type="text/javascript" src="js/alog-timeline.js"></script>
+	<script type="text/javascript" src="js/alog-group.js"></script>
+	<script type="text/javascript" src="js/alog-comet.js"></script>
+	<script type="text/javascript" src="js/alog-utils.js"></script>
+	
+</body>
+</html>

@@ -17,6 +17,8 @@ import de.alog.load.Messages.ReadState
 import de.alog.load.Messages.RestoreLogfileState
 import scala.util.Try
 import org.joda.time.DateTime
+import com.mongodb.casbah.Imports._
+import com.mongodb.BasicDBList
 
 class PersistentSourceManager(loadManager:ActorRef) extends Actor with LogDatabase with PersistentSourceManagerLike with ActorLogging {
 
@@ -47,44 +49,35 @@ trait PersistentSourceManagerLike {
 
   def saveLogQueue(queue: Seq[LogRequest]) {
     implicit val ec = context.system.dispatcher
-    val lWithId = queue.map(l => (l.file.hash, l))
-    redisDb.smembers[String]("sources").map { currm => 
-      val (currms, newms) = (currm.toSet, lWithId.map(_._1).toSet)
-      val todel = currms -- newms
-      val toadd = newms -- currms
-      if (todel.nonEmpty) 
-        redisDb.del(todel.map(id => s"sources.${id}").toSeq : _*)
-      if (todel.nonEmpty || toadd.nonEmpty) {
-        redisDb.del("sources").onSuccess {
-          case _ if lWithId.nonEmpty => 
-            redisDb.sadd("sources", lWithId.map(_._1).toSeq: _*)
-        }
-      }
-    }
-    val tosafe = lWithId.map {
-      case (key, l) => (s"sources.${key}", JsObject(Map(
-        "file" -> JsString(l.file),
-        "labels" -> JsObject(l.labels.map{ case (k,v) => (k, JsString(v))}),
-        "state" -> JsString(
-            l.recentState.flatMap(
-                _.readMark.map(_.map("%02X".format(_)).mkString))
-            .getOrElse(""))
-        )).compactPrint)
-    }
-    redisDb.mset(tosafe.toMap).foreach { _ =>
-      log.info("saved log state")
+    Future {
+      val logStates = mongoDb("sourceState")
+      logStates.remove(MongoDBObject.empty)
+      logStates.insert(
+        queue.map { le => 
+          MongoDBObject(
+            "_id" -> le.file.hash,
+            "type" -> "source",
+            "file" -> le.file,
+            "labels" -> le.labels.map{ case (k,v) => (k, JsString(v))},
+            "state" -> le.recentState.flatMap(_.readMark.map(_.map("%02X".format(_)).mkString)).getOrElse("")
+         )
+      }:_*)
     }
   }
   
   def loadLogQueue() : Future[Seq[LogRequest]] = {
     implicit val ec = context.system.dispatcher
-    val raws = redisDb.smembers[String]("sources").flatMap(ids => redisDb.mget[String](ids.map(id => s"sources.${id}"): _*))
-    raws.map(_.collect {case Some(raw) => raw.parseJson.asJsObject
-      .getFields("file", "labels", "state") match {
-      case Seq(JsString(file), JsObject(labels), JsString(state)) =>
-        LogRequest(file, labels.map {case (k,JsString(v)) => (k,v)}, Deadline.now, Some(ReadState(hex2bytes(state), false, "loaded from saved state")))
-      }
-    })
+    Future {
+      mongoDb("sourceState").find(MongoDBObject("type" -> "source")).map { o =>
+        for (
+         file <- o.getAs[String]("file");
+         labels <- o.getAs[Map[String,Any]]("labels").map(_.mapValues { case l:BasicDBList if l.nonEmpty => l.getAs[String](0).getOrElse("")});
+         state <- o.getAs[String]("state").map(hex2bytes _))
+        yield {
+          LogRequest(file, labels, Deadline.now, Some(ReadState(state, false, "loaded from saved state")))
+        }
+      }.collect { case Some(l) => l }.toSeq
+    }
   }
   
   def hex2bytes(s:String): Option[Array[Byte]] = 

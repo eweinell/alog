@@ -46,7 +46,8 @@ resolvers ++= Seq(
 		"io.spray"					%% "spray-json"			% "1.2.6",
 		"io.spray"					%% "spray-testkit"		% sprayVersion	% "test",
 		"joda-time"					% "joda-time"			% "2.3",
-		"org.joda"					% "joda-convert"		% "1.2"
+		"org.joda"					% "joda-convert"		% "1.2",
+		"com.jcraft"				% "jsch"				% "0.1.51"
 //		"eu.fakod"					%% "neo4j-scala"		% "0.3.0",
 //		"org.anormcypher"			%% "anormcypher"		% "0.4.4",
 //		"org.neo4j"					% "neo4j"				% "2.0.3"

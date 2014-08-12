@@ -1,0 +1,119 @@
+.nav, .pagination, .carousel, .panel-title a {
+	cursor: pointer;
+}
+.navbar {
+	border-style: none;
+	background: rgba(237,237,237,1);
+	background: -moz-linear-gradient(top, rgba(237,237,237,1) 0%, rgba(250,250,250,1) 75%, rgba(250,250,250,0.22) 100%);
+	background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(237,237,237,1)), color-stop(75%, rgba(250,250,250,1)), color-stop(100%, rgba(250,250,250,0.22)));
+	background: -webkit-linear-gradient(top, rgba(237,237,237,1) 0%, rgba(250,250,250,1) 75%, rgba(250,250,250,0.22) 100%);
+	background: -o-linear-gradient(top, rgba(237,237,237,1) 0%, rgba(250,250,250,1) 75%, rgba(250,250,250,0.22) 100%);
+	background: -ms-linear-gradient(top, rgba(237,237,237,1) 0%, rgba(250,250,250,1) 75%, rgba(250,250,250,0.22) 100%);
+	background: linear-gradient(to bottom, rgba(237,237,237,1) 0%, rgba(250,250,250,1) 75%, rgba(250,250,250,0.22) 100%);
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ededed', endColorstr='#fafafa', GradientType=0 );
+}
+
+body {
+	padding-top: 70px;
+}
+
+#timeline_chart {
+	height: 80px;
+}
+
+.log.feature {
+	color: gray;
+	font-size: small;
+}
+
+.feature .value {
+	font-weight: bold;
+}
+
+.log.message {
+	display: inline-block;
+}
+
+.filterRow {
+	position: relative;
+}
+
+.filterRow input {
+	padding-right: 20px;
+}
+
+.filterRow.all {
+	padding-top: 12px;
+	padding-bottom: 6px;
+}
+
+.viewFeatureRow {
+	min-height: 22px;
+} 
+
+.viewFeatureLabel {
+	padding-top: 6px;
+}
+
+.plainBtn {
+	cursor: pointer;
+	background: none;
+	border-style: none;
+	color: gray;
+}
+
+.deleteBtn {
+	display: block;
+	position: absolute;
+	top: 10px;
+	right: 80px;
+	width: 16px;
+	height: 16px;
+	z-index: 2;
+}
+
+.date-time-pck .datepck {
+	float:left;
+	margin-top:34px;
+}
+
+.logDetail .key {
+	font-weight: bold;
+    text-align: right;
+}
+
+div.logDetail.message {
+	margin-top: 12px;
+	font-family: monospace;
+}
+/*
+div.logDetail.message {
+	overflow-y: scroll;
+	height: 400px;
+}
+*/
+.duration {
+	margin-top:34px;
+}
+
+.duration .durationInput {
+	width: 4em;
+}
+
+.log.feature .logFeatureFilter.notFiltered {
+	display: none;
+}
+
+.log.feature:hover .logFeatureFilter.notFiltered {
+	display: inline-block;
+}
+
+.log.feature .logFeatureFilter.filtered {
+	display: inline-block;
+}
+
+.group_chart {
+	height: 280px;
+	margin-top: 9px;
+	margin-bottom: 3px;
+}

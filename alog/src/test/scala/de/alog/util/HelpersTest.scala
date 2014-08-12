@@ -48,4 +48,16 @@ class HelpersTest extends Specification {
       Helpers.parseDuration("1h30m") must_== new Period().plusHours(1).plusMinutes(30)
     }
   }
+  
+  "AppServDateTime" should {
+    "parse syslog datetime" in {
+      AppServDateTime.unapply("8/10/14 5:48:03:845 CEST") match {
+        case Some(d) => {
+          d.getDayOfMonth() must_==10
+          d.getMonthOfYear() must_==8
+          d.getYear() must_==2014
+        }
+      }
+    }
+  }
 }

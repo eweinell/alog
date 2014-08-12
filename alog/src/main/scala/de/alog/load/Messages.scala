@@ -4,7 +4,7 @@ import scala.concurrent.duration.Deadline
 
 object Messages {
   
-  case class ReadState(readMark:Option[Array[Byte]], failed:Boolean, state:String, occurences:Int=1) 
+  case class ReadState(readMark:Option[Array[Byte]], failed:Boolean, state:String, occurences:Int=1, history:List[Long]=Nil) 
   
 	case class LogRequest(file:String, labels:Map[String,String], scheduled:Deadline, recentState:Option[ReadState]) {
     def update(f:Option[ReadState]=>ReadState) = LogRequest(file=this.file, labels=this.labels, scheduled=this.scheduled, Some(f(this.recentState)))

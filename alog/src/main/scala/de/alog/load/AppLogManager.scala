@@ -5,18 +5,19 @@ import akka.actor._
 import akka.util._
 import akka.pattern._
 import scala.concurrent.duration._
-import Deadline.now
+import Deadline._
 import scala.collection._
 import mutable.Queue
 import scala.math.Ordering.by
 import scala.util.Sorting
 import scala.util.Random
+import scala.math.Numeric
 
 class AppLogManager(workerClientRef:ActorRef) extends Actor with ActorLogging {
 
   implicit val ec = context.system.dispatcher
   
-  val timeoutTime = 60 seconds
+  val timeoutTime = 120 seconds
   val cycleTime = 30 seconds
   val scheduleSlackTime = 500 millis
   
@@ -30,7 +31,7 @@ class AppLogManager(workerClientRef:ActorRef) extends Actor with ActorLogging {
     case RegisterLogfile(f, l@_*) => 
       workQueue.find(_.file == f) match {
         case None => 
-          workQueue += LogRequest(f, l.toMap, workQueue.length * 250 millis fromNow, None)
+          workQueue += LogRequest(f, l.toMap, workQueue.length * 500 millis fromNow, None)
           workQueue = workQueue.sorted
           self ! Tick(false)
         case _ =>
@@ -57,8 +58,8 @@ class AppLogManager(workerClientRef:ActorRef) extends Actor with ActorLogging {
       }
     case Completed(req:LogRequest) =>
       workQueue.dequeueFirst(_.file == req.file)
-      val waitTime = req.recentState.map(s => if (s.failed && s.occurences <= 3) timeoutTime else cycleTime).getOrElse(timeoutTime)   
-      workQueue += reschedule( waitTime fromNow)(req)
+      val waitTime = req.recentState.map(s => if (s.failed && s.occurences <= 3) timeoutTime else getTimeout(s)).getOrElse(timeoutTime)   
+      workQueue += reschedule( waitTime.fromNow)(req)
       workQueue = workQueue.sorted      
     case Rejected(req:LogRequest) => 
       workQueue.dequeueFirst(_.file == req.file)
@@ -77,6 +78,17 @@ class AppLogManager(workerClientRef:ActorRef) extends Actor with ActorLogging {
   }
   
   private def reschedule(newSchedule:Deadline)(item:LogRequest) = LogRequest(item.file,item.labels,newSchedule,item.recentState)
+  
+  private val maxRate = 64
+  private val ratio = 1.5 // expected ratio of reads / new content found - 1.5 yields the sequence 2/3 - 1/3 - 1/6 - 1/12
+  
+  private def getTimeout(r:ReadState): FiniteDuration = {
+    import math._
+    val time = System.currentTimeMillis
+    val period = cycleTime.toMillis
+    val level = r.history.foldLeft(maxRate)((a,b) => Math.min(a, floor((time - b) / (ratio * period)).toInt))
+    cycleTime * (1 + level)
+  } 
 }
 
 

@@ -25,8 +25,6 @@ class AppLogLoaderSpecs extends Specification {
   	    case _ => None
   	  }
 			o must_!= null
-//  	  val f = AppLogLoader.readLines("C:/Users/erhard/tmp/logstuff/console_VorgangsverwaltungServiceProviderEAR.log").toSeq
-//  	  f.length must_== 11434
   	}
   }
 }
